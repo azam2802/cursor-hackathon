@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:summer_activity/core/firebase/firebase_initializer.dart';
 
 import 'screens/home_shell.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_text_styles.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeFirebase();
   runApp(const SummerDriftApp());
 }
 

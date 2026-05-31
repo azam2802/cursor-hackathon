@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "892051670753",
+    "project_id": "cursor-hackat",
+    "storage_bucket": "cursor-hackat.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:892051670753:android:54619dcc195f25b32799a0",
+        "android_client_info": {
+          "package_name": "com.example.summer_activity"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLN_5e9ZKWZf9ourd-FtKOIFan9X_8gmk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
