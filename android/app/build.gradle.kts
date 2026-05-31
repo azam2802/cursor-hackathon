@@ -25,7 +25,9 @@ android {
         applicationId = "com.example.summer_activity"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // camera + Firebase (Firestore/Storage) require a higher floor than the
+        // Flutter default, so pin minSdk to 23.
+        minSdk = maxOf(23, flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

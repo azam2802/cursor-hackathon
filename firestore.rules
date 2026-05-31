@@ -1,0 +1,45 @@
+rules_version = '2';
+
+// =============================================================================
+// Geo-Tag Catch (тайники) — Firestore security rules.
+//
+// These rules are NOT applied automatically. Deploy them with:
+//   firebase deploy --only firestore:rules,storage
+// or paste them into Firebase Console → Firestore Database → Rules.
+// Firebase project: cursor-hackat
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /caches/{cacheId} {
+      // Any signed-in user can read caches (the whole game is auth-gated).
+      allow read: if request.auth != null;
+
+      // Only the authenticated owner can create their cache, and they must
+      // stamp themselves as the owner on the new document.
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.ownerId;
+
+      // The owner may fully update or delete their own cache.
+      allow update, delete: if request.auth != null
+        && request.auth.uid == resource.data.ownerId;
+
+      // Best-effort "I opened this cache" rule: any signed-in user may update a
+      // cache they don't own ONLY by touching `openedBy`, ONLY in a way that
+      // grows the list and includes their own uid (arrayUnion). A fully
+      // airtight arrayUnion check is not expressible in rules, so we verify
+      // that `openedBy` is the sole changed field, the caller's uid is present,
+      // and the list never shrinks.
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['openedBy'])
+        && request.auth.uid in request.resource.data.openedBy
+        && request.resource.data.openedBy.size() >= resource.data.openedBy.size();
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

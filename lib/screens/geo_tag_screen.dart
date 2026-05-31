@@ -1,20 +1,74 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../core/geo/cache_repository.dart';
+import '../core/geo/location_service.dart';
+import '../core/geo/models/geo_cache.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import 'geo_tag/ar_find_screen.dart';
+import 'geo_tag/create_cache_sheet.dart';
+import 'geo_tag/nearby_caches_view.dart';
 
-/// Geo-Tag Catch screen — an AR-style cache finder.
+/// Geo-Tag Catch — the AR geocaching game («тайники»).
 ///
-/// The camera viewport is a static mockup (sky, forest, crosshair, AR pin).
-/// Real camera/AR + distance tracking can be layered in later.
-class GeoTagScreen extends StatelessWidget {
-  const GeoTagScreen({super.key});
+/// Hosted as tab index 2 inside [HomeShell]'s `IndexedStack`, so it renders
+/// without its own [Scaffold] and keeps its state alive across tab switches.
+///
+/// Wires the feature's building blocks into one screen:
+/// * default view is [NearbyCachesView] («Найти»), which streams nearby caches
+///   and hands off to the AR experience;
+/// * a header action opens [CreateCacheSheet] to hide a new cache («Спрятать
+///   тайник») — the list auto-refreshes via the underlying Firestore stream;
+/// * tapping «Открыть в AR» pushes [ArFindScreen] for the selected cache.
+///
+/// A single [CacheRepository] and [LocationService] are constructed here and
+/// shared with every child so the whole feature reads one source of truth.
+/// [cacheRepository] and [locationService] are injectable for testing and
+/// default-constructed when omitted, keeping the public constructor compatible
+/// with `const GeoTagScreen()`.
+class GeoTagScreen extends StatefulWidget {
+  const GeoTagScreen({
+    super.key,
+    this.cacheRepository,
+    this.locationService,
+  });
 
-  static const List<_CacheStep> _steps = [
-    _CacheStep('#12', 'Дуб-великан', 'Найден', done: true),
-    _CacheStep('#47', 'Поляна', '38 м', done: true),
-    _CacheStep('#33', 'Скала', '890 м'),
-  ];
+  final CacheRepository? cacheRepository;
+  final LocationService? locationService;
+
+  @override
+  State<GeoTagScreen> createState() => _GeoTagScreenState();
+}
+
+class _GeoTagScreenState extends State<GeoTagScreen> {
+  late final CacheRepository _repository =
+      widget.cacheRepository ?? CacheRepository();
+  late final LocationService _location =
+      widget.locationService ?? const LocationService();
+
+  void _openCreateSheet() {
+    // The sheet shares this screen's repository/location instances; on success
+    // it pops with `true`, but no manual refresh is needed because
+    // [NearbyCachesView] listens to the live Firestore stream.
+    CreateCacheSheet.show(
+      context,
+      cacheRepository: _repository,
+      locationService: _location,
+    );
+  }
+
+  void _openInAr(GeoCache cache) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ArFindScreen(
+          cache: cache,
+          cacheRepository: _repository,
+          locationService: _location,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,336 +76,166 @@ class GeoTagScreen extends StatelessWidget {
       color: AppColors.geoBg,
       child: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _CameraView(),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _DistanceProgress(distance: '38 м', progress: 0.62),
-                    const SizedBox(height: 10),
-                    _StepsRow(steps: _steps),
-                  ],
+        child: StreamBuilder<User?>(
+          stream: FirebaseAuth.instance.authStateChanges(),
+          builder: (context, snapshot) {
+            final user = snapshot.data ?? FirebaseAuth.instance.currentUser;
+            final signedIn = user != null;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _Header(onHide: signedIn ? _openCreateSheet : null),
+                Expanded(
+                  child: signedIn
+                      ? NearbyCachesView(
+                          cacheRepository: _repository,
+                          locationService: _location,
+                          onOpenInAr: _openInAr,
+                        )
+                      : const _SignedOutPrompt(),
                 ),
-              ),
-            ],
-          ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class _CameraView extends StatelessWidget {
-  const _CameraView();
+/// Title, subtitle and the «Спрятать тайник» action.
+///
+/// The action is shown only when a user is signed in (`onHide != null`).
+class _Header extends StatelessWidget {
+  const _Header({this.onHide});
+
+  final VoidCallback? onHide;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 230,
-      child: Stack(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Sky / ground bands.
-          Positioned.fill(child: Container(color: const Color(0xFFB8EBD8))),
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SizedBox(height: 100, child: ColoredBox(color: Color(0xFFC7EDFF))),
-          ),
-          const Positioned(
-            top: 90,
-            left: 0,
-            right: 0,
-            child: SizedBox(height: 100, child: ColoredBox(color: Color(0xFF7BC67E))),
-          ),
-          // Trees.
-          const Positioned(
-            bottom: 0,
-            left: 16,
-            child: _Tree(treeColor: Color(0xFF1E7D43), topSize: 36, trunkHeight: 40),
-          ),
-          const Positioned(
-            bottom: 0,
-            right: 24,
-            child: _Tree(treeColor: Color(0xFF2D8A55), topSize: 28, trunkHeight: 28),
-          ),
-          const Positioned(
-            bottom: 4,
-            left: 70,
-            child: _Tree(treeColor: Color(0xFF247A3C), topSize: 44, trunkHeight: 32),
-          ),
-          // AR pin bubble.
-          Positioned(
-            top: 36,
-            left: 40,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.mint, width: 2),
-                  ),
-                  child: Text(
-                    'Тайник #47',
-                    style: AppTextStyles.body(
-                      size: 11,
-                      weight: FontWeight.w900,
-                      color: AppColors.textDark,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Тайники',
+                      style: AppTextStyles.display(
+                        size: 26,
+                        color: AppColors.textDark,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Прячьте тайники на карте и ищите чужие в AR — '
+                      'дойдите до места и откройте находку.',
+                      style: AppTextStyles.body(
+                        size: 12,
+                        color: AppColors.textMid,
+                      ),
+                    ),
+                  ],
                 ),
-                CustomPaint(
-                  size: const Size(12, 7),
-                  painter: _TrianglePainter(AppColors.mint),
-                ),
-              ],
-            ),
-          ),
-          // Crosshair.
-          const Center(child: _Crosshair()),
-          // Distance badge.
-          Positioned(
-            top: 12,
-            right: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.mint,
-                borderRadius: BorderRadius.circular(10),
               ),
-              child: Text(
-                '38 м',
+              if (onHide != null) ...[
+                const SizedBox(width: 12),
+                _HideButton(onPressed: onHide!),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact mint pill that opens the create-cache flow.
+class _HideButton extends StatelessWidget {
+  const _HideButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.mint,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.add_location_alt_rounded,
+                  color: AppColors.white, size: 22),
+              const SizedBox(height: 2),
+              Text(
+                'Спрятать',
                 style: AppTextStyles.body(
                   size: 11,
                   weight: FontWeight.w900,
                   color: AppColors.white,
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Tree extends StatelessWidget {
-  const _Tree({
-    required this.treeColor,
-    required this.topSize,
-    required this.trunkHeight,
-  });
-
-  final Color treeColor;
-  final double topSize;
-  final double trunkHeight;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CustomPaint(
-          size: Size(topSize, topSize),
-          painter: _TrianglePainter(treeColor, pointUp: true),
-        ),
-        Container(
-          width: topSize * 0.22,
-          height: trunkHeight,
-          color: const Color(0xFF4A7C59),
-        ),
-      ],
-    );
-  }
-}
-
-/// Draws a filled triangle, either pointing up (tree top) or down (bubble tail).
-class _TrianglePainter extends CustomPainter {
-  const _TrianglePainter(this.color, {this.pointUp = false});
-
-  final Color color;
-  final bool pointUp;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final path = Path();
-    if (pointUp) {
-      path
-        ..moveTo(size.width / 2, 0)
-        ..lineTo(size.width, size.height)
-        ..lineTo(0, size.height)
-        ..close();
-    } else {
-      path
-        ..moveTo(0, 0)
-        ..lineTo(size.width, 0)
-        ..lineTo(size.width / 2, size.height)
-        ..close();
-    }
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _TrianglePainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.pointUp != pointUp;
-}
-
-class _Crosshair extends StatelessWidget {
-  const _Crosshair();
-
-  @override
-  Widget build(BuildContext context) {
-    const lineColor = Color(0xCC00C9A7);
-    return SizedBox(
-      width: 56,
-      height: 56,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(width: 56, height: 2, color: lineColor),
-          Container(width: 2, height: 56, color: lineColor),
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.mint, width: 2.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DistanceProgress extends StatelessWidget {
-  const _DistanceProgress({required this.distance, required this.progress});
-
-  final String distance;
-  final double progress;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'До тайника',
-                style: AppTextStyles.body(
-                  size: 12,
-                  weight: FontWeight.w800,
-                  color: AppColors.textDark,
-                ),
-              ),
-              Text(distance, style: AppTextStyles.display(size: 13, color: AppColors.mint)),
             ],
           ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 8,
-              backgroundColor: const Color(0xFFD0F5EC),
-              valueColor: const AlwaysStoppedAnimation(AppColors.mint),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CacheStep {
-  const _CacheStep(this.number, this.name, this.distance, {this.done = false});
-
-  final String number;
-  final String name;
-  final String distance;
-  final bool done;
-}
-
-class _StepsRow extends StatelessWidget {
-  const _StepsRow({required this.steps});
-
-  final List<_CacheStep> steps;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < steps.length; i++) ...[
-          if (i > 0) const SizedBox(width: 6),
-          Expanded(child: _StepCard(step: steps[i])),
-        ],
-      ],
-    );
-  }
-}
-
-class _StepCard extends StatelessWidget {
-  const _StepCard({required this.step});
-
-  final _CacheStep step;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: step.done ? AppColors.mint : Colors.transparent,
-          width: 2,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            step.number,
-            style: AppTextStyles.display(
-              size: 13,
-              color: step.done ? AppColors.mint : AppColors.textLight,
+    );
+  }
+}
+
+/// Friendly themed prompt shown when no user is signed in.
+class _SignedOutPrompt extends StatelessWidget {
+  const _SignedOutPrompt();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.white,
+                border: Border.all(color: AppColors.mint, width: 3),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.travel_explore_rounded,
+                size: 48,
+                color: AppColors.mint,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            step.name,
-            style: AppTextStyles.body(
-              size: 11,
-              weight: FontWeight.w800,
-              color: AppColors.textDark,
+            const SizedBox(height: 20),
+            Text(
+              'Войдите, чтобы играть в тайники',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.display(size: 20, color: AppColors.textDark),
             ),
-          ),
-          Text(
-            step.distance,
-            style: AppTextStyles.body(
-              size: 11,
-              color: AppColors.textLight,
+            const SizedBox(height: 8),
+            Text(
+              'Авторизуйтесь в профиле, чтобы прятать свои тайники и '
+              'находить чужие рядом с вами.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body(size: 13, color: AppColors.textMid),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

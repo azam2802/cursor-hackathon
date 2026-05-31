@@ -1,0 +1,30 @@
+rules_version = '2';
+
+// =============================================================================
+// Geo-Tag Catch (тайники) — Cloud Storage security rules.
+//
+// These rules are NOT applied automatically. Deploy them with:
+//   firebase deploy --only firestore:rules,storage
+// or paste them into Firebase Console → Storage → Rules.
+// Firebase project: cursor-hackat
+// =============================================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Cache photos are stored at caches/{uid}/{cacheId}.jpg
+    // (see CacheRepository._uploadPhoto).
+    match /caches/{uid}/{fileName} {
+      // Any signed-in user may view cache photos.
+      allow read: if request.auth != null;
+
+      // Only the owner (path uid == caller) may upload, replace or delete.
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Deny everything else by default.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
