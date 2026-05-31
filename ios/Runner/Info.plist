@@ -5,7 +5,7 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Нужен доступ к геолокации, чтобы находить и прятать тайники рядом с вами.</string>
+	<string>Геолокация нужна, чтобы подбирать активности и строить маршруты рядом с вами, а также находить и прятать тайники.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Камера нужна для AR-режима поиска тайников.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

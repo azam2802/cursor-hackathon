@@ -25,9 +25,9 @@ android {
         applicationId = "com.example.summer_activity"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // camera + Firebase (Firestore/Storage) require a higher floor than the
-        // Flutter default, so pin minSdk to 23.
-        minSdk = maxOf(23, flutter.minSdkVersion)
+        // Floor raised above the Flutter default for: Google Maps SDK (API 24+),
+        // camera, and Firebase (Firestore/Storage). 24 satisfies all of them.
+        minSdk = maxOf(24, flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

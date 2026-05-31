@@ -49,6 +49,15 @@ dependencies:
   firebase_storage: ^12.4.10
   image_picker: ^1.2.2
 
+  # AI planner (YandexGPT) + Google Places (New) REST calls.
+  http: ^1.2.2
+
+  # Google Maps for displaying recommended activities + the day route.
+  google_maps_flutter: ^2.17.1
+
+  # Local persistence for the summer checklist.
+  shared_preferences: ^2.3.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
