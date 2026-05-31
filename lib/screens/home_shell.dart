@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/auth/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'roulette_screen.dart';
@@ -10,7 +11,9 @@ import 'profile_screen.dart';
 /// Root scaffold that hosts the four primary destinations and the shared
 /// bottom navigation bar, matching the SummerDrift design.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  const HomeShell({super.key, this.authService});
+
+  final AuthService? authService;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -26,18 +29,18 @@ class _HomeShellState extends State<HomeShell> {
     _NavItem(icon: Icons.person, label: 'профиль', color: AppColors.coral),
   ];
 
-  static const List<Widget> _screens = [
-    RouletteScreen(),
-    MoodAiScreen(),
-    GeoTagScreen(),
-    ProfileScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      const RouletteScreen(),
+      const MoodAiScreen(),
+      const GeoTagScreen(),
+      ProfileScreen(authService: widget.authService),
+    ];
+
     return Scaffold(
       // IndexedStack keeps each screen's state alive when switching tabs.
-      body: IndexedStack(index: _index, children: _screens),
+      body: IndexedStack(index: _index, children: screens),
       bottomNavigationBar: _BottomNav(
         items: _navItems,
         currentIndex: _index,

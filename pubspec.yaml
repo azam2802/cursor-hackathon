@@ -39,6 +39,8 @@ dependencies:
   # Provides the Righteous (display) and Nunito (body) fonts used by the
   # SummerDrift design without bundling font assets manually.
   google_fonts: ^6.2.1
+  firebase_auth: ^5.7.0
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:

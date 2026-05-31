@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:summer_activity/core/auth/auth_service.dart';
 import 'package:summer_activity/core/firebase/firebase_initializer.dart';
 
-import 'screens/home_shell.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_text_styles.dart';
+import 'widgets/auth_wrapper.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeFirebase();
-  runApp(const SummerDriftApp());
+  runApp(SummerDriftApp(authService: AuthService()));
 }
 
 class SummerDriftApp extends StatelessWidget {
-  const SummerDriftApp({super.key});
+  const SummerDriftApp({super.key, required this.authService});
+
+  final AuthService authService;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +34,7 @@ class SummerDriftApp extends StatelessWidget {
           bodyMedium: AppTextStyles.body(),
         ),
       ),
-      home: const HomeShell(),
+      home: AuthWrapper(authService: authService),
     );
   }
 }
